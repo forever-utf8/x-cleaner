@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         X 批量屏蔽垃圾账号
 // @namespace    https://github.com/forever-utf8/x-cleaner
-// @version      1.5.0
+// @version      1.5.1
 // @description  在 X(Twitter) 页面按「用户名/handle 关键词」或「推文内容关键词」自动扫描并批量屏蔽引流/垃圾账号；点➕追加关键词后立即扫描屏蔽，屏蔽速度已提到最快。
 // @author       Proma
 // @license      MIT
@@ -52,7 +52,7 @@
     MAX_BLOCK_PER_RUN: 30,
 
     // 干跑模式：true 只在控制台/面板列出会被屏蔽的用户，不真正屏蔽（首次使用建议先开）。
-    DRY_RUN: false,
+    DRY_RUN: true,
 
     // 关键词匹配是否忽略大小写（对中文无影响，对英文关键词有效）。
     IGNORE_CASE: true,
@@ -61,7 +61,7 @@
     UI_WAIT_MS: 4000,
 
     // 自动运行：进入推文详情页（URL 含 /status/）自动扫描屏蔽，无需手点。
-    AUTO_RUN: true,
+    AUTO_RUN: false,
 
     // 自动运行仅限推文详情页（true）；若为 false 则在任何页面都自动运行。
     AUTO_RUN_ONLY_STATUS: true,
