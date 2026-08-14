@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         X 批量屏蔽垃圾账号
 // @namespace    https://github.com/forever-utf8/x-cleaner
-// @version      1.5.1
+// @version      1.6.0
 // @description  在 X(Twitter) 页面按「用户名/handle 关键词」或「推文内容关键词」自动扫描并批量屏蔽引流/垃圾账号；点➕追加关键词后立即扫描屏蔽，屏蔽速度已提到最快。
 // @author       Proma
 // @license      MIT
@@ -181,6 +181,29 @@
   }
   function savePermKeywords() {
     try { localStorage.setItem(LS_KEY, JSON.stringify(permKeywords)); } catch (e) {}
+  }
+
+  // 面板开关持久化（干跑/自动）：用户改过后写 localStorage，刷新/重开保持。
+  // 本地未存过时才用代码里的 CONFIG 默认值。
+  const LS_SETTINGS_KEY = 'xBlockSpam.settings';
+  function loadSettings() {
+    try {
+      const raw = localStorage.getItem(LS_SETTINGS_KEY);
+      if (!raw) return;
+      const s = JSON.parse(raw);
+      if (s && typeof s === 'object') {
+        if (typeof s.dryRun === 'boolean') CONFIG.DRY_RUN = s.dryRun;
+        if (typeof s.autoRun === 'boolean') CONFIG.AUTO_RUN = s.autoRun;
+      }
+    } catch (e) {}
+  }
+  function saveSettings() {
+    try {
+      localStorage.setItem(LS_SETTINGS_KEY, JSON.stringify({
+        dryRun: CONFIG.DRY_RUN,
+        autoRun: CONFIG.AUTO_RUN,
+      }));
+    } catch (e) {}
   }
   function addPermKeyword(kw) {
     const k = String(kw || '').trim();
@@ -495,7 +518,7 @@
       borderRadius: '999px', padding: '6px 10px', cursor: 'pointer',
     });
     const syncDry = () => { dryBtn.textContent = CONFIG.DRY_RUN ? '干跑:开' : '干跑:关'; };
-    dryBtn.onclick = () => { CONFIG.DRY_RUN = !CONFIG.DRY_RUN; syncDry(); updatePanel(); };
+    dryBtn.onclick = () => { CONFIG.DRY_RUN = !CONFIG.DRY_RUN; saveSettings(); syncDry(); updatePanel(); };
     syncDry();
 
     const autoBtn = document.createElement('button');
@@ -509,6 +532,7 @@
     };
     autoBtn.onclick = () => {
       CONFIG.AUTO_RUN = !CONFIG.AUTO_RUN;
+      saveSettings();
       syncAuto();
       if (CONFIG.AUTO_RUN) { setupAuto(); maybeAutoRun('手动开启自动'); }
     };
@@ -658,6 +682,7 @@
     if (document.body) {
       clearInterval(boot);
       loadPermKeywords();
+      loadSettings();
       buildPanel();
       setupAuto();
       // 初次进入若已在推文页，自动跑一次
