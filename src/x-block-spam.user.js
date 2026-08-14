@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         X 批量屏蔽垃圾账号
 // @namespace    https://github.com/forever-utf8/x-cleaner
-// @version      1.7.0
+// @version      1.8.0
 // @description  在 X(Twitter) 页面按「用户名/handle 关键词」或「推文内容关键词」自动扫描并批量屏蔽引流/垃圾账号；点➕追加关键词后立即扫描屏蔽，屏蔽速度已提到最快。
 // @author       Proma
 // @license      MIT
@@ -166,18 +166,30 @@
   // 面板临时关键词（单个，本次扫描叠加到配置列表）
   const tempKw = { username: '', content: '' };
 
-  // 永久关键词（用户手动追加，localStorage 落盘，合并存：对用户名和推文都生效）
-  const LS_KEY = 'xBlockSpam.permKeywords';
-  let permKeywords = [];
+  // 永久关键词（用户手动追加，localStorage 落盘）。
+  // 拆分为两个列表，与内置 USERNAME/CONTENT_KEYWORDS 语义对齐：
+  //   permUsernameKeywords → 只查用户名/@handle
+  //   permContentKeywords  → 只查推文正文
+  const LS_UNAME_KEY = 'xBlockSpam.permUsernameKeywords';
+  const LS_CONTENT_KEY = 'xBlockSpam.permContentKeywords';
+  let permUsernameKeywords = [];
+  let permContentKeywords = [];
   function loadPermKeywords() {
-    try {
-      const raw = localStorage.getItem(LS_KEY);
-      permKeywords = raw ? JSON.parse(raw) : [];
-      if (!Array.isArray(permKeywords)) permKeywords = [];
-    } catch (e) { permKeywords = []; }
+    permUsernameKeywords = readArr(LS_UNAME_KEY);
+    permContentKeywords = readArr(LS_CONTENT_KEY);
   }
-  function savePermKeywords() {
-    try { localStorage.setItem(LS_KEY, JSON.stringify(permKeywords)); } catch (e) {}
+  function readArr(key) {
+    try {
+      const raw = localStorage.getItem(key);
+      const a = raw ? JSON.parse(raw) : [];
+      return Array.isArray(a) ? a : [];
+    } catch (e) { return []; }
+  }
+  function savePermUsername() {
+    try { localStorage.setItem(LS_UNAME_KEY, JSON.stringify(permUsernameKeywords)); } catch (e) {}
+  }
+  function savePermContent() {
+    try { localStorage.setItem(LS_CONTENT_KEY, JSON.stringify(permContentKeywords)); } catch (e) {}
   }
 
   // 面板开关持久化（干跑/自动）：用户改过后写 localStorage，刷新/重开保持。
@@ -202,17 +214,31 @@
       }));
     } catch (e) {}
   }
-  function addPermKeyword(kw) {
+  // 追加到“用户名永久词”
+  function addPermUsername(kw) {
     const k = String(kw || '').trim();
     if (!k) return false;
-    if (permKeywords.includes(k)) return false; // 去重
-    permKeywords.push(k);
-    savePermKeywords();
+    if (permUsernameKeywords.includes(k)) return false; // 去重
+    permUsernameKeywords.push(k);
+    savePermUsername();
     return true;
   }
-  function removePermKeyword(kw) {
-    const i = permKeywords.indexOf(kw);
-    if (i >= 0) { permKeywords.splice(i, 1); savePermKeywords(); }
+  // 追加到“正文永久词”
+  function addPermContent(kw) {
+    const k = String(kw || '').trim();
+    if (!k) return false;
+    if (permContentKeywords.includes(k)) return false; // 去重
+    permContentKeywords.push(k);
+    savePermContent();
+    return true;
+  }
+  function removePermUsername(kw) {
+    const i = permUsernameKeywords.indexOf(kw);
+    if (i >= 0) { permUsernameKeywords.splice(i, 1); savePermUsername(); }
+  }
+  function removePermContent(kw) {
+    const i = permContentKeywords.indexOf(kw);
+    if (i >= 0) { permContentKeywords.splice(i, 1); savePermContent(); }
   }
 
   // 判断该 tweet 是否命中规则，返回 { hit, reason }
@@ -220,12 +246,12 @@
     const unameKw = normKw(
       USERNAME_KEYWORDS
         .concat(tempKw.username ? [tempKw.username] : [])
-        .concat(permKeywords)
+        .concat(permUsernameKeywords)
     );
     const contentKw = normKw(
       CONTENT_KEYWORDS
         .concat(tempKw.content ? [tempKw.content] : [])
-        .concat(permKeywords)
+        .concat(permContentKeywords)
     );
 
     const nameHay = `${info.displayName} ${info.handle}`;
@@ -452,8 +478,8 @@
     statEl = document.createElement('div');
     Object.assign(statEl.style, { marginBottom: '8px', color: '#8b98a5' });
 
-    // 临时关键词输入行（input + ➕永久按钮）
-    const mkInputRow = (ph) => {
+    // 临时关键词输入行（input + ➕永久按钮）；addFn 决定➕加到哪个永久列表
+    const mkInputRow = (ph, addFn, kindLabel) => {
       const row = document.createElement('div');
       Object.assign(row.style, { display: 'flex', gap: '6px', marginBottom: '6px' });
       const inp = document.createElement('input');
@@ -471,15 +497,15 @@
       });
       const addBtn = document.createElement('button');
       addBtn.textContent = '➕';
-      addBtn.title = '把这个词追加到永久列表';
+      addBtn.title = `把这个词追加到「${kindLabel}」永久列表`;
       Object.assign(addBtn.style, {
         border: '1px solid #38444d', color: '#e7e9ea', background: 'transparent',
         borderRadius: '8px', padding: '0 10px', cursor: 'pointer', fontSize: '13px',
       });
       addBtn.onclick = () => {
-        const ok = addPermKeyword(inp.value);
+        const ok = addFn(inp.value);
         if (ok) {
-          log(`➕ 已入永久列表：「${inp.value.trim()}」`);
+          log(`➕ 已入「${kindLabel}」永久列表：「${inp.value.trim()}」`);
           inp.value = '';
           renderPerm();
           // 追加后马上扫描 & 屏蔽一次
@@ -491,8 +517,8 @@
       row.appendChild(addBtn);
       return { row, inp };
     };
-    const unameRow = mkInputRow('临时用户名关键词(可空)');
-    const contentRow = mkInputRow('临时推文关键词(可空)');
+    const unameRow = mkInputRow('临时/➕用户名关键词', addPermUsername, '用户名');
+    const contentRow = mkInputRow('临时/➕推文关键词', addPermContent, '正文');
     unameInput = unameRow.inp;
     contentInput = contentRow.inp;
 
@@ -568,33 +594,45 @@
       permToggle.textContent = permOpen ? '▾' : '▸';
     };
     function renderPerm() {
-      permTitle.textContent = `永久词 (${permKeywords.length})`;
+      const total = permUsernameKeywords.length + permContentKeywords.length;
+      permTitle.textContent = `永久词 (${total})`;
       permList.innerHTML = '';
-      if (permKeywords.length === 0) {
-        const empty = document.createElement('span');
-        empty.textContent = '无';
-        empty.style.color = '#55606b';
-        permList.appendChild(empty);
-        return;
-      }
-      permKeywords.forEach((kw) => {
-        const chip = document.createElement('span');
-        Object.assign(chip.style, {
-          display: 'inline-flex', alignItems: 'center', gap: '4px',
-          background: '#1d2733', border: '1px solid #38444d', borderRadius: '999px',
-          padding: '2px 6px 2px 8px', fontSize: '11px', color: '#e7e9ea',
+
+      // 渲染一组（标题行 + chips）
+      const renderGroup = (groupLabel, arr, removeFn) => {
+        const head = document.createElement('div');
+        head.textContent = `${groupLabel} (${arr.length})`;
+        Object.assign(head.style, { width: '100%', color: '#8b98a5', fontSize: '11px', margin: '2px 0' });
+        permList.appendChild(head);
+        if (arr.length === 0) {
+          const empty = document.createElement('span');
+          empty.textContent = '无';
+          empty.style.color = '#55606b';
+          permList.appendChild(empty);
+          return;
+        }
+        arr.forEach((kw) => {
+          const chip = document.createElement('span');
+          Object.assign(chip.style, {
+            display: 'inline-flex', alignItems: 'center', gap: '4px',
+            background: '#1d2733', border: '1px solid #38444d', borderRadius: '999px',
+            padding: '2px 6px 2px 8px', fontSize: '11px', color: '#e7e9ea',
+          });
+          const label = document.createElement('span');
+          label.textContent = kw;
+          const del = document.createElement('span');
+          del.textContent = '✕';
+          del.title = '删除';
+          Object.assign(del.style, { cursor: 'pointer', color: '#8b98a5' });
+          del.onclick = () => { removeFn(kw); renderPerm(); log(`已删除${groupLabel}永久词：「${kw}」`); };
+          chip.appendChild(label);
+          chip.appendChild(del);
+          permList.appendChild(chip);
         });
-        const label = document.createElement('span');
-        label.textContent = kw;
-        const del = document.createElement('span');
-        del.textContent = '✕';
-        del.title = '删除';
-        Object.assign(del.style, { cursor: 'pointer', color: '#8b98a5' });
-        del.onclick = () => { removePermKeyword(kw); renderPerm(); log(`已删除永久词：「${kw}」`); };
-        chip.appendChild(label);
-        chip.appendChild(del);
-        permList.appendChild(chip);
-      });
+      };
+
+      renderGroup('用户名', permUsernameKeywords, removePermUsername);
+      renderGroup('正文', permContentKeywords, removePermContent);
     }
     renderPerm();
     permWrap.appendChild(permHead);
