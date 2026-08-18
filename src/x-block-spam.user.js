@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         X 批量屏蔽垃圾账号
 // @namespace    https://github.com/forever-utf8/x-cleaner
-// @version      1.9.0
+// @version      1.9.1
 // @description  在 X(Twitter) 页面按「用户名/handle 关键词」或「推文内容关键词」自动扫描并批量屏蔽引流/垃圾账号；点➕追加关键词后立即扫描屏蔽，屏蔽速度已提到最快。
 // @author       Proma
 // @license      MIT
@@ -619,6 +619,7 @@
     const permHead = document.createElement('div');
     Object.assign(permHead.style, { display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#8b98a5', marginBottom: '4px', cursor: 'pointer' });
     const permTitle = document.createElement('span');
+    Object.assign(permTitle.style, { textDecoration: 'underline' });
     const permToggle = document.createElement('span');
     permToggle.textContent = '▸';
     permHead.appendChild(permTitle);
