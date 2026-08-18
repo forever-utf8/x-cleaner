@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         X 批量屏蔽垃圾账号
 // @namespace    https://github.com/forever-utf8/x-cleaner
-// @version      1.9.1
+// @version      1.9.2
 // @description  在 X(Twitter) 页面按「用户名/handle 关键词」或「推文内容关键词」自动扫描并批量屏蔽引流/垃圾账号；点➕追加关键词后立即扫描屏蔽，屏蔽速度已提到最快。
 // @author       Proma
 // @license      MIT
@@ -25,7 +25,7 @@
   // 模式1：命中「显示名 或 @handle」中任一关键词即屏蔽
   const USERNAME_KEYWORDS = [
     '破处', '同城', '约炮', '约爱', '线下约见', '点头像约', '真实可靠',
-    // 从面板永久词固化：身份/人设特征，做用户名/昵称才可疑（仅查名字，避免正文误伤）
+    // 从面板自定义匹配词固化：身份/人设特征，做用户名/昵称才可疑（仅查名字，避免正文误伤）
     '体制内老师', '小护士', '少妇', '单男', '初男', '处男', '主人',
     '纯情', '大一', '反差', '风骚', '搭子',
   ];
@@ -33,7 +33,7 @@
   // 模式2：命中「推文正文」中任一关键词即屏蔽
   const CONTENT_KEYWORDS = [
     '同城', '约炮', '免费破处', '点头像约', '线下约见', '同城约爱', '同城会面',
-    // 从面板永久词固化：正文招嫖/引流话术与动作词（仅查正文）
+    // 从面板自定义匹配词固化：正文招嫖/引流话术与动作词（仅查正文）
     '比她骚', '太涩了', '我福不黑', '比她sao', '比我骚', '比我Sao', '打✈️',
     '无偿约萢', '固萢', '约操', '线下', '破初', '催情', '找炮友', '无偿约',
     '需要哥哥', '固炮', '寻欢', '被人', '匹配', '野战', '约见', '过夜',
@@ -215,7 +215,7 @@
       }));
     } catch (e) {}
   }
-  // 追加到“用户名永久词”
+  // 追加到“用户名自定义匹配词”
   function addPermUsername(kw) {
     const k = String(kw || '').trim();
     if (!k) return false;
@@ -224,7 +224,7 @@
     savePermUsername();
     return true;
   }
-  // 追加到“正文永久词”
+  // 追加到“正文自定义匹配词”
   function addPermContent(kw) {
     const k = String(kw || '').trim();
     if (!k) return false;
@@ -496,7 +496,7 @@
     statEl = document.createElement('div');
     Object.assign(statEl.style, { marginBottom: '8px', color: '#8b98a5' });
 
-    // 临时关键词输入行（input + ➕永久按钮）；addFn 决定➕加到哪个永久列表
+    // 临时关键词输入行（input + ➕按钮）；addFn 决定➕加到哪个自定义匹配词列表
     const mkInputRow = (ph, addFn, kindLabel) => {
       const row = document.createElement('div');
       Object.assign(row.style, { display: 'flex', gap: '6px', marginBottom: '6px' });
@@ -515,7 +515,7 @@
       });
       const addBtn = document.createElement('button');
       addBtn.textContent = '➕';
-      addBtn.title = `把这个词追加到「${kindLabel}」永久列表`;
+      addBtn.title = `把这个词追加到「${kindLabel}」自定义匹配词`;
       Object.assign(addBtn.style, {
         border: '1px solid #38444d', color: '#e7e9ea', background: 'transparent',
         borderRadius: '8px', padding: '0 10px', cursor: 'pointer', fontSize: '13px',
@@ -523,7 +523,7 @@
       addBtn.onclick = () => {
         const ok = addFn(inp.value);
         if (ok) {
-          log(`➕ 已入「${kindLabel}」永久列表：「${inp.value.trim()}」`);
+          log(`➕ 已入「${kindLabel}」自定义匹配词：「${inp.value.trim()}」`);
           inp.value = '';
           renderPerm();
           // 追加后马上扫描 & 屏蔽一次
@@ -613,7 +613,7 @@
       whiteSpace: 'pre-wrap', wordBreak: 'break-all',
     });
 
-    // 永久词管理区
+    // 自定义匹配词管理区
     const permWrap = document.createElement('div');
     Object.assign(permWrap.style, { margin: '8px 0' });
     const permHead = document.createElement('div');
@@ -637,7 +637,7 @@
     };
     function renderPerm() {
       const total = permUsernameKeywords.length + permContentKeywords.length;
-      permTitle.textContent = `永久词 (${total})`;
+      permTitle.textContent = `自定义匹配词 (${total})`;
       permList.innerHTML = '';
 
       // 渲染一组（标题行 + chips）
@@ -666,7 +666,7 @@
           del.textContent = '✕';
           del.title = '删除';
           Object.assign(del.style, { cursor: 'pointer', color: '#8b98a5' });
-          del.onclick = () => { removeFn(kw); renderPerm(); log(`已删除${groupLabel}永久词：「${kw}」`); };
+          del.onclick = () => { removeFn(kw); renderPerm(); log(`已删除${groupLabel}自定义匹配词：「${kw}」`); };
           chip.appendChild(label);
           chip.appendChild(del);
           permList.appendChild(chip);
