@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         X 批量屏蔽垃圾账号
 // @namespace    https://github.com/forever-utf8/x-cleaner
-// @version      1.8.0
+// @version      1.9.0
 // @description  在 X(Twitter) 页面按「用户名/handle 关键词」或「推文内容关键词」自动扫描并批量屏蔽引流/垃圾账号；点➕追加关键词后立即扫描屏蔽，屏蔽速度已提到最快。
 // @author       Proma
 // @license      MIT
@@ -73,6 +73,7 @@
   const state = {
     running: false,
     stopRequested: false,
+    killed: false,               // 点右上角 ✕ 后置位，不再执行任何扫描/屏蔽/自动逻辑
     blockedHandles: new Set(),   // 本次会话已屏蔽（去重）
     processedHandles: new Set(), // 本次运行已处理过的（去重，避免重复开菜单）
     blockedCount: 0,
@@ -304,6 +305,7 @@
    * ④  主流程：扫描当前可见推文并（可选）屏蔽
    * ======================================================= */
   async function run() {
+    if (state.killed) return;   // 已禁用，不执行
     if (state.running) return;
     state.running = true;
     state.stopRequested = false;
@@ -472,8 +474,24 @@
     });
 
     const title = document.createElement('div');
-    title.textContent = 'X 批量屏蔽';
-    Object.assign(title.style, { fontWeight: '700', marginBottom: '6px', fontSize: '13px' });
+    Object.assign(title.style, {
+      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+      fontWeight: '700', marginBottom: '6px', fontSize: '13px',
+    });
+    const titleText = document.createElement('span');
+    titleText.textContent = 'X 批量屏蔽';
+    const closeBtn = document.createElement('span');
+    closeBtn.textContent = '✕';
+    closeBtn.title = '关闭并禁用脚本（当前页面不再运行）';
+    Object.assign(closeBtn.style, {
+      cursor: 'pointer', color: '#8b98a5', fontWeight: '700',
+      padding: '0 4px', lineHeight: '1', userSelect: 'none',
+    });
+    closeBtn.onmouseenter = () => { closeBtn.style.color = '#d9363e'; };
+    closeBtn.onmouseleave = () => { closeBtn.style.color = '#8b98a5'; };
+    closeBtn.onclick = () => { disableScript(); };
+    title.appendChild(titleText);
+    title.appendChild(closeBtn);
 
     statEl = document.createElement('div');
     Object.assign(statEl.style, { marginBottom: '8px', color: '#8b98a5' });
@@ -529,6 +547,7 @@
     Object.assign(runBtn.style, {
       flex: '1', border: 'none', color: '#fff', background: '#1d9bf0',
       borderRadius: '999px', padding: '6px 0', cursor: 'pointer', fontWeight: '700',
+      textAlign: 'center',
     });
     runBtn.onclick = () => {
       if (state.running) { state.stopRequested = true; }
@@ -564,6 +583,28 @@
     btnRow.appendChild(runBtn);
     btnRow.appendChild(dryBtn);
     btnRow.appendChild(autoBtn);
+
+    // 日志头部行：左“日志” + 右“清除”
+    const logHead = document.createElement('div');
+    Object.assign(logHead.style, {
+      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+      color: '#8b98a5', marginBottom: '4px',
+    });
+    const logLabel = document.createElement('span');
+    logLabel.textContent = '日志';
+    const clearBtn = document.createElement('span');
+    clearBtn.textContent = '清除';
+    clearBtn.title = '清空当前日志';
+    Object.assign(clearBtn.style, {
+      cursor: 'pointer', color: '#8b98a5', fontSize: '11px',
+      border: '1px solid #38444d', borderRadius: '6px', padding: '1px 8px',
+      userSelect: 'none',
+    });
+    clearBtn.onmouseenter = () => { clearBtn.style.color = '#e7e9ea'; };
+    clearBtn.onmouseleave = () => { clearBtn.style.color = '#8b98a5'; };
+    clearBtn.onclick = () => { if (logEl) logEl.innerHTML = ''; };
+    logHead.appendChild(logLabel);
+    logHead.appendChild(clearBtn);
 
     logEl = document.createElement('div');
     Object.assign(logEl.style, {
@@ -644,6 +685,7 @@
     panelEl.appendChild(contentRow.row);
     panelEl.appendChild(btnRow);
     panelEl.appendChild(permWrap);
+    panelEl.appendChild(logHead);
     panelEl.appendChild(logEl);
     document.body.appendChild(panelEl);
 
@@ -656,6 +698,7 @@
    * ======================================================= */
   let autoObserver = null;
   let rescanTimer = null;
+  let urlPollTimer = null;
 
   function isStatusPage() {
     return /\/status\/\d+/.test(location.pathname);
@@ -663,6 +706,7 @@
 
   // 是否允许在当前页自动运行
   function autoAllowedHere() {
+    if (state.killed) return false;   // 已禁用，一律不自动运行
     if (!CONFIG.AUTO_RUN) return false;
     if (CONFIG.AUTO_RUN_ONLY_STATUS) return isStatusPage();
     return true;
@@ -704,12 +748,23 @@
 
     // 2) 监听 SPA URL 变化（进入新推文页）
     let lastPath = location.pathname;
-    setInterval(() => {
+    urlPollTimer = setInterval(() => {
+      if (state.killed) return;
       if (location.pathname !== lastPath) {
         lastPath = location.pathname;
         maybeAutoRun('进入新页面');
       }
     }, 800);
+  }
+
+  // 关闭并禁用脚本：置 killed、断开自动运行、移除面板。当前页面不再执行任何脚本逻辑。
+  function disableScript() {
+    state.killed = true;
+    state.stopRequested = true;
+    clearTimeout(rescanTimer);
+    if (urlPollTimer) { clearInterval(urlPollTimer); urlPollTimer = null; }
+    if (autoObserver) { autoObserver.disconnect(); autoObserver = null; }
+    if (panelEl) { panelEl.remove(); panelEl = null; }
   }
 
   // 等页面基本就绪再挂面板
