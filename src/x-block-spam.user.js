@@ -370,6 +370,7 @@
         state.blockedCount++;
         markBlocked(article);
         log(`✅ 已屏蔽 ${info.handle}`);
+        addBlockedItem(info);
       } else {
         unhighlight(article);
         log(`⚠️ 跳过 ${info.handle}：${res.err}`);
@@ -439,7 +440,7 @@
   /* =========================================================
    * ⑤  浮动控制面板 + 日志
    * ======================================================= */
-  let panelEl, statEl, logEl, runBtn, unameInput, contentInput;
+  let panelEl, statEl, logEl, blockedEl, runBtn, unameInput, contentInput;
 
   function log(text) {
     // eslint-disable-next-line no-console
@@ -451,6 +452,31 @@
       logEl.scrollTop = logEl.scrollHeight;
       while (logEl.childNodes.length > 200) logEl.removeChild(logEl.firstChild);
     }
+  }
+
+  // 向“已屏蔽”tab 追加一条可点击项，点击新标签页打开该用户主页。
+  // 纯内存（就在 DOM 里），刷新页面自然清空；“清除”只清日志不影响这里。
+  function addBlockedItem(info) {
+    if (!blockedEl) return;
+    const handle = info.handle || '';               // 含 @
+    const uname = handle.replace(/^@/, '');
+    if (!uname) return;
+
+    const item = document.createElement('a');
+    item.href = `https://x.com/${uname}`;
+    item.target = '_blank';
+    item.rel = 'noopener noreferrer';
+    const nameStr = info.displayName ? `${info.displayName} ` : '';
+    item.textContent = `🚫 ${nameStr}${handle}`;
+    item.title = `打开 https://x.com/${uname}`;
+    Object.assign(item.style, {
+      display: 'block', color: '#1d9bf0', textDecoration: 'none',
+      padding: '2px 0', cursor: 'pointer', wordBreak: 'break-all',
+    });
+    item.onmouseenter = () => { item.style.textDecoration = 'underline'; };
+    item.onmouseleave = () => { item.style.textDecoration = 'none'; };
+    blockedEl.appendChild(item);
+    blockedEl.scrollTop = blockedEl.scrollHeight;
   }
 
   function updatePanel() {
@@ -584,17 +610,40 @@
     btnRow.appendChild(dryBtn);
     btnRow.appendChild(autoBtn);
 
-    // 日志头部行：左“日志” + 右“清除”
+    // Tab 头：左侧两个可点 Tab（日志 / 已屏蔽）+ 右侧“清除”（仅清日志）
     const logHead = document.createElement('div');
     Object.assign(logHead.style, {
       display: 'flex', justifyContent: 'space-between', alignItems: 'center',
       color: '#8b98a5', marginBottom: '4px',
     });
-    const logLabel = document.createElement('span');
-    logLabel.textContent = '日志';
+    const tabWrap = document.createElement('div');
+    Object.assign(tabWrap.style, { display: 'flex', gap: '10px', alignItems: 'center' });
+
+    const tabLog = document.createElement('span');
+    tabLog.textContent = '日志';
+    const tabBlocked = document.createElement('span');
+    tabBlocked.textContent = '已屏蔽';
+    const tabBaseStyle = { cursor: 'pointer', userSelect: 'none', paddingBottom: '2px' };
+    Object.assign(tabLog.style, tabBaseStyle);
+    Object.assign(tabBlocked.style, tabBaseStyle);
+
+    let activeTab = 'log';
+    const syncTabs = () => {
+      const on = { color: '#e7e9ea', borderBottom: '2px solid #1d9bf0', fontWeight: '700' };
+      const off = { color: '#8b98a5', borderBottom: '2px solid transparent', fontWeight: '400' };
+      Object.assign(tabLog.style, activeTab === 'log' ? on : off);
+      Object.assign(tabBlocked.style, activeTab === 'blocked' ? on : off);
+      if (logEl) logEl.style.display = activeTab === 'log' ? 'block' : 'none';
+      if (blockedEl) blockedEl.style.display = activeTab === 'blocked' ? 'block' : 'none';
+    };
+    tabLog.onclick = () => { activeTab = 'log'; syncTabs(); };
+    tabBlocked.onclick = () => { activeTab = 'blocked'; syncTabs(); };
+    tabWrap.appendChild(tabLog);
+    tabWrap.appendChild(tabBlocked);
+
     const clearBtn = document.createElement('span');
     clearBtn.textContent = '清除';
-    clearBtn.title = '清空当前日志';
+    clearBtn.title = '清空当前日志（不影响已屏蔽列表）';
     Object.assign(clearBtn.style, {
       cursor: 'pointer', color: '#8b98a5', fontSize: '11px',
       border: '1px solid #38444d', borderRadius: '6px', padding: '1px 8px',
@@ -603,7 +652,7 @@
     clearBtn.onmouseenter = () => { clearBtn.style.color = '#e7e9ea'; };
     clearBtn.onmouseleave = () => { clearBtn.style.color = '#8b98a5'; };
     clearBtn.onclick = () => { if (logEl) logEl.innerHTML = ''; };
-    logHead.appendChild(logLabel);
+    logHead.appendChild(tabWrap);
     logHead.appendChild(clearBtn);
 
     logEl = document.createElement('div');
@@ -611,6 +660,15 @@
       maxHeight: '160px', overflowY: 'auto', background: '#0e1620',
       borderRadius: '8px', padding: '6px', fontSize: '11px', color: '#aeb8c2',
       whiteSpace: 'pre-wrap', wordBreak: 'break-all',
+    });
+
+    // 已屏蔽列表（与日志平行，同时只显示一个）
+    blockedEl = document.createElement('div');
+    Object.assign(blockedEl.style, {
+      display: 'none',
+      maxHeight: '160px', overflowY: 'auto', background: '#0e1620',
+      borderRadius: '8px', padding: '6px', fontSize: '11px', color: '#aeb8c2',
+      wordBreak: 'break-all',
     });
 
     // 自定义匹配词管理区
@@ -688,8 +746,10 @@
     panelEl.appendChild(permWrap);
     panelEl.appendChild(logHead);
     panelEl.appendChild(logEl);
+    panelEl.appendChild(blockedEl);
     document.body.appendChild(panelEl);
 
+    syncTabs();
     updatePanel();
     log('面板就绪。自动运行' + (CONFIG.AUTO_RUN ? '已开启' : '已关闭') + '。');
   }
