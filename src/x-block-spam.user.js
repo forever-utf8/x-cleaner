@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         X 批量屏蔽垃圾账号
 // @namespace    https://github.com/forever-utf8/x-cleaner
-// @version      1.11.0
+// @version      1.12.0
 // @description  在 X(Twitter) 页面按「用户名/handle 关键词」或「推文内容关键词」自动扫描并批量屏蔽引流/垃圾账号；点➕追加关键词后立即扫描屏蔽，屏蔽速度已提到最快。
 // @author       Proma
 // @license      MIT
@@ -71,6 +71,9 @@
 
     // 页面追加新内容/滚动后自动重扫的去抖延时（毫秒）。
     AUTO_RESCAN_DEBOUNCE_MS: 1200,
+
+    // 详情页（/status/）只屏蔽下方评论，不屏蔽原帖正文作者。true 强烈建议开。
+    PROTECT_MAIN_TWEET: true,
   };
 
   /* =========================================================
@@ -168,6 +171,28 @@
     content = readTextWithEmoji(textEl);
 
     return { handle, displayName, content };
+  }
+
+  // 当前 URL 的推文 id（仅 /status/<id> 页有）
+  function getCurrentStatusId() {
+    const m = location.pathname.match(/\/status\/(\d+)/);
+    return m ? m[1] : '';
+  }
+
+  // 判断某个 article 是否为“原帖正文”（而非评论）。
+  // 依据：原帖的时间戳永久链接指向当前页 status id；评论指向各自的推文 id。
+  // 非详情页（无 status id）永远返回 false（漴）。
+  function isMainTweet(article) {
+    const curId = getCurrentStatusId();
+    if (!curId) return false;
+    // article 内所有 /.../status/<id> 链接，命中当前 id 即为原帖
+    const links = article.querySelectorAll('a[href*="/status/"]');
+    for (const a of links) {
+      const href = a.getAttribute('href') || '';
+      const mm = href.match(/\/status\/(\d+)/);
+      if (mm && mm[1] === curId) return true;
+    }
+    return false;
   }
 
   // 面板临时关键词（单个，本次扫描叠加到配置列表）
@@ -333,6 +358,10 @@
     // ---- 阶段1：扫描并高亮所有命中的推文 ----
     const matched = []; // { article, info, reason }
     for (const article of articles) {
+      // 详情页下保护原帖正文作者：只屏蔽下方评论，跳过原帖
+      if (CONFIG.PROTECT_MAIN_TWEET && isMainTweet(article)) {
+        continue;
+      }
       const info = extractTweetInfo(article);
       if (!info.handle) continue;
 
