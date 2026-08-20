@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         X 批量屏蔽垃圾账号
 // @namespace    https://github.com/forever-utf8/x-cleaner
-// @version      1.12.0
+// @version      1.13.0
 // @description  在 X(Twitter) 页面按「用户名/handle 关键词」或「推文内容关键词」自动扫描并批量屏蔽引流/垃圾账号；点➕追加关键词后立即扫描屏蔽，屏蔽速度已提到最快。
 // @author       Proma
 // @license      MIT
@@ -40,7 +40,7 @@
     // 从面板自定义匹配词固化：正文招嫖/引流话术与动作词（仅查正文）
     '比她骚', '太涩了', '我福不黑', '比她sao', '比我骚', '比我Sao', '打✈️',
     '无偿约萢', '固萢', '约操', '破初', '催情', '找炮友', '无偿约',
-    '需要哥哥', '固炮', '寻欢', '被人', '匹配', '野战', '约见', '过夜',
+    '需要哥哥', '固炮', '寻欢', '野战', '约见', '过夜',
     // 从面板自定义匹配词固化（第二批）
     '给你看福', '体制内老师', '打🛩', '锐评一下我的福',
   ];
@@ -386,7 +386,7 @@
       updatePanel();
       const dmsg = `扫描完成（干跑）：命中 ${state.matchedCount} 个用户，未执行屏蔽`;
       log(dmsg);
-      toast(dmsg);
+      toast(`命中：${state.matchedCount}个用户（干跑）`);
       return;
     }
 
@@ -422,7 +422,7 @@
 
     const msg = `本次已屏蔽 ${state.blockedCount} 个用户（命中 ${state.matchedCount}）`;
     log(msg);
-    toast(msg);
+    toast(`已屏蔽：${state.blockedCount}个用户`);
   }
 
   /* =========================================================
@@ -451,12 +451,13 @@
     const el = document.createElement('div');
     el.textContent = text;
     Object.assign(el.style, {
-      position: 'fixed', right: '16px', bottom: '200px', zIndex: 1000000,
-      maxWidth: '300px', background: '#1d9bf0', color: '#fff',
-      padding: '10px 14px', borderRadius: '10px',
-      font: '13px/1.5 system-ui, sans-serif', fontWeight: '700',
-      boxShadow: '0 4px 16px rgba(0,0,0,.45)',
-      opacity: '0', transform: 'translateY(8px)',
+      position: 'fixed', left: '16px', bottom: '16px', zIndex: 1000000,
+      maxWidth: '260px', background: 'rgba(21,32,43,.85)', color: '#aeb8c2',
+      padding: '6px 10px', borderRadius: '8px',
+      border: '1px solid rgba(56,68,77,.6)',
+      font: '12px/1.4 system-ui, sans-serif', fontWeight: '400',
+      boxShadow: '0 2px 8px rgba(0,0,0,.25)',
+      opacity: '0', transform: 'translateY(6px)',
       transition: 'opacity .25s ease, transform .25s ease',
       pointerEvents: 'none',
     });
@@ -467,7 +468,7 @@
     });
     setTimeout(() => {
       el.style.opacity = '0';
-      el.style.transform = 'translateY(8px)';
+      el.style.transform = 'translateY(6px)';
       setTimeout(() => el.remove(), 300);
     }, duration);
   }
